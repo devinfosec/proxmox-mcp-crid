@@ -100,8 +100,18 @@ log "upgrading pip"
 as_service_user "$INSTALL_DIR/.venv/bin/pip" install --upgrade pip
 
 if [[ -n $LOCAL_CHECKOUT ]]; then
-  log "installing proxmox-mcp-vr from local checkout $LOCAL_CHECKOUT"
-  as_service_user "$INSTALL_DIR/.venv/bin/pip" install --upgrade "$LOCAL_CHECKOUT"
+  # The checkout may live under a 0700 home (e.g. /root); mcp can't read it
+  # directly. Stage a copy to a /tmp path mcp owns, install from there.
+  STAGE="$(mktemp -d)"
+  log "staging $LOCAL_CHECKOUT to $STAGE for unprivileged install"
+  cp -a "$LOCAL_CHECKOUT/." "$STAGE/"
+  rm -rf "$STAGE/.venv" "$STAGE/.git" "$STAGE"/*.egg-info "$STAGE/.pytest_cache" \
+         "$STAGE/.ruff_cache"
+  chown -R "$SERVICE_USER:$SERVICE_USER" "$STAGE"
+
+  log "installing proxmox-mcp-vr from $STAGE"
+  as_service_user "$INSTALL_DIR/.venv/bin/pip" install --upgrade "$STAGE"
+  rm -rf "$STAGE"
 else
   log "installing proxmox-mcp-vr from $REPO_URL @ $REPO_REF"
   as_service_user "$INSTALL_DIR/.venv/bin/pip" install --upgrade \
