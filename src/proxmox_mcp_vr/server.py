@@ -106,8 +106,12 @@ def build_server():
     # Upstream stores the proxmoxer.ProxmoxAPI at proxmox_manager.api.
     pve_api = upstream.proxmox_manager.api
     client = ProxmoxClient(pve_api)
-    client.refresh_index()
     bind_client(client)
+
+    # Don't warm the pool index here. If PVE is temporarily unreachable, or the
+    # token is misconfigured, that should surface as a structured error on the
+    # first tool call — not a crash loop on startup. The cache lazy-fills via
+    # ProxmoxClient.lookup() on first miss.
 
     _filter_and_wrap(mcp)
     register_all(mcp, client)

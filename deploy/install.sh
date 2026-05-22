@@ -225,11 +225,39 @@ systemctl enable proxmox-mcp >/dev/null
 systemctl restart proxmox-mcp
 
 # ---------- 6. verify ----------------------------------------------------
-sleep 1
-if ! systemctl is-active --quiet proxmox-mcp; then
-  warn "proxmox-mcp failed to start. Logs:"
-  journalctl -u proxmox-mcp -n 40 --no-pager >&2
-  die "service not running"
+# Poll the bind port instead of just `is-active` — startup is async and the
+# is-active check used to pass at t=1s before the upstream PVE handshake at
+# t=4s, masking real failures behind a "service running" message.
+PORT="${MCP_BIND##*:}"
+HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-20}"
+
+log "waiting up to ${HEALTH_TIMEOUT}s for proxmox-mcp to bind :$PORT"
+bound=0
+for _ in $(seq 1 "$HEALTH_TIMEOUT"); do
+  if ss -ltn "sport = :$PORT" 2>/dev/null | awk 'NR>1 {print}' | grep -q .; then
+    bound=1; break
+  fi
+  if ! systemctl is-active --quiet proxmox-mcp; then
+    break  # service already dead, no point polling further
+  fi
+  sleep 1
+done
+
+if [[ $bound -ne 1 ]]; then
+  warn "proxmox-mcp did not bind :$PORT within ${HEALTH_TIMEOUT}s. Logs:"
+  journalctl -u proxmox-mcp -n 60 --no-pager >&2
+  die "service not healthy"
+fi
+
+# Even with the port bound, do an end-to-end auth check: a request without
+# the bearer should 401. If anything else happens (5xx, hang, wrong port),
+# the install isn't actually usable.
+log "smoke test: unauthenticated /sse should 401"
+http_code=$(curl -sS -o /dev/null -m 5 -w '%{http_code}' "http://127.0.0.1:$PORT/sse" || echo "000")
+if [[ $http_code != "401" ]]; then
+  warn "smoke test returned $http_code (expected 401). Logs:"
+  journalctl -u proxmox-mcp -n 60 --no-pager >&2
+  die "service responded but not as expected"
 fi
 
 log "done."
@@ -239,12 +267,9 @@ cat <<EOF
   pool scope:    $ALLOWED_POOL
   bearer token:  $(cat "$BEARER_FILE")
 
-  Smoke test (from this LXC):
-    curl -sS -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:${MCP_BIND##*:}/sse
-    # -> 401 (auth required, good)
+  Authenticated smoke test (from this LXC):
     curl -sS -H "Authorization: Bearer \$(cat $BEARER_FILE)" -N \\
-         http://127.0.0.1:${MCP_BIND##*:}/sse | head -c 200
-    # -> SSE stream opens, good
+         http://127.0.0.1:$PORT/sse | head -c 200
 
   Add to ~/.crid/mcp_servers.json on the operator workstation; see README.
 

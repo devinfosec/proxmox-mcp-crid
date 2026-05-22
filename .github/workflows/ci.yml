@@ -15,12 +15,11 @@ jobs:
       - name: install
         run: |
           python -m pip install --upgrade pip
-          # Install without the upstream git dep so CI doesn't depend on a
-          # private/external repo; tests use FakeAPI fixtures and never import
-          # proxmox_mcp.server.
-          pip install -e . --no-deps
-          pip install pytest pytest-asyncio respx pytest-httpx starlette uvicorn \
-                      proxmoxer 'pydantic>=2' anyio requests httpx ruff
+          # Install the upstream from git so integration tests can exercise
+          # the real ProxmoxMCPServer wiring (would have caught the
+          # .api/.proxmox bug, JSON config bug, etc.).
+          pip install -e .
+          pip install pytest pytest-asyncio respx pytest-httpx httpx ruff
       - name: ruff
         run: ruff check src tests
       - name: pytest

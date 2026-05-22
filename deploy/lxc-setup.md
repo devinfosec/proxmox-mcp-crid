@@ -22,6 +22,10 @@ pveum user add mcp-agent@pve --comment "proxmox-mcp-vr service account"
 pveum aclmod /pool/ai-redteam -user mcp-agent@pve -role MCPVRAgent
 
 # Token. Capture the printed secret — it's shown once.
+# --privsep 0 = token inherits the user's role (simpler).
+# --privsep 1 (PVE default) = token has its own ACL; if you choose that,
+#   also run:  pveum aclmod /pool/ai-redteam \
+#                  -token 'mcp-agent@pve!mcpvr' -role MCPVRAgent
 pveum user token add mcp-agent@pve mcpvr --privsep 0
 ```
 
