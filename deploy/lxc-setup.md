@@ -87,9 +87,9 @@ python3.11 -m venv /opt/proxmox-mcp/.venv
     git+https://github.com/devinfosec/proxmox-mcp-crid.git@main
 
 install -d -m 750 -o root -g mcp /etc/proxmox-mcp
-install -m 640 -o root -g mcp deploy/config.example.toml /etc/proxmox-mcp/config.toml
+install -m 640 -o root -g mcp deploy/config.example.json /etc/proxmox-mcp/config.json
 install -m 640 -o root -g mcp deploy/env.example         /etc/proxmox-mcp/env
-# Now edit /etc/proxmox-mcp/config.toml — set host + token_value.
+# Now edit /etc/proxmox-mcp/config.json — set host + token_value.
 
 pwgen -s 64 1 > /etc/proxmox-mcp/bearer
 chown root:mcp /etc/proxmox-mcp/bearer
@@ -126,6 +126,6 @@ systemctl restart proxmox-mcp
 ```bash
 pveum user token remove mcp-agent@pve mcpvr
 pveum user token add    mcp-agent@pve mcpvr --privsep 0
-# Update token_value in /etc/proxmox-mcp/config.toml on the LXC.
+# Update token_value in /etc/proxmox-mcp/config.json on the LXC.
 systemctl restart proxmox-mcp
 ```

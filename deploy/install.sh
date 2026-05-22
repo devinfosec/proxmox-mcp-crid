@@ -124,40 +124,53 @@ prompt PVE_USER       "Proxmox user@realm"          "$PVE_USER_DEFAULT"
 prompt PVE_TOKEN_NAME "Proxmox API token name"      "$PVE_TOKEN_NAME_DEFAULT"
 prompt PVE_TOKEN_VALUE "Proxmox API token value"    ""                 silent
 
-CONFIG_TOML="$CONFIG_DIR/config.toml"
-if [[ -f $CONFIG_TOML ]]; then
-  log "preserving existing $CONFIG_TOML (back it up + re-run if you want a rewrite)"
+CONFIG_JSON="$CONFIG_DIR/config.json"
+
+# Legacy: earlier installer versions wrote TOML. Upstream loads JSON.
+if [[ -f "$CONFIG_DIR/config.toml" ]]; then
+  warn "removing legacy $CONFIG_DIR/config.toml (upstream loads JSON, not TOML)"
+  rm -f "$CONFIG_DIR/config.toml"
+fi
+
+if [[ -f $CONFIG_JSON ]]; then
+  log "preserving existing $CONFIG_JSON (back it up + re-run if you want a rewrite)"
 else
-  log "writing $CONFIG_TOML"
+  log "writing $CONFIG_JSON"
   umask 027
-  cat > "$CONFIG_TOML" <<EOF
-[proxmox]
-host = "$PVE_HOST"
-port = 8006
-verify_ssl = true
-service = "PVE"
-
-[auth]
-user = "$PVE_USER"
-token_name = "$PVE_TOKEN_NAME"
-token_value = "$PVE_TOKEN_VALUE"
-
-[logging]
-level = "INFO"
-
-[mcp]
-host = "${MCP_BIND%%:*}"
-port = ${MCP_BIND##*:}
-transport = "SSE"
+  cat > "$CONFIG_JSON" <<EOF
+{
+  "proxmox": {
+    "host": "$PVE_HOST",
+    "port": 8006,
+    "verify_ssl": true,
+    "service": "PVE"
+  },
+  "auth": {
+    "user": "$PVE_USER",
+    "token_name": "$PVE_TOKEN_NAME",
+    "token_value": "$PVE_TOKEN_VALUE"
+  },
+  "logging": {
+    "level": "INFO"
+  },
+  "mcp": {
+    "host": "${MCP_BIND%%:*}",
+    "port": ${MCP_BIND##*:},
+    "transport": "SSE"
+  },
+  "jobs": {
+    "sqlite_path": "$STATE_DIR/jobs.sqlite3"
+  }
+}
 EOF
-  chown root:"$SERVICE_USER" "$CONFIG_TOML"
-  chmod 640 "$CONFIG_TOML"
+  chown root:"$SERVICE_USER" "$CONFIG_JSON"
+  chmod 640 "$CONFIG_JSON"
 fi
 
 ENV_FILE="$CONFIG_DIR/env"
 log "writing $ENV_FILE"
 cat > "$ENV_FILE" <<EOF
-PROXMOX_MCP_CONFIG=$CONFIG_TOML
+PROXMOX_MCP_CONFIG=$CONFIG_JSON
 PROXMOX_ALLOWED_POOL=$ALLOWED_POOL
 MCP_BEARER_TOKEN_FILE=$CONFIG_DIR/bearer
 MCP_BIND=$MCP_BIND
