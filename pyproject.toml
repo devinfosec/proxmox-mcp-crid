@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "proxmox-mcp-vr"
+version = "0.1.0"
+description = "Proxmox MCP server scoped to VR/RE/ExDev workflows. Wraps ProxmoxMCP-Plus, denies destructive tools, adds in-guest QEMU agent control + pool guard."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "devinfosec" }]
+dependencies = [
+    "proxmox-mcp-plus @ git+https://github.com/RekklesNA/ProxmoxMCP-Plus.git@main",
+    "mcp>=1.8.0,<2.0.0",
+    "proxmoxer>=2.0.1,<3.0.0",
+    "pydantic>=2.0.0,<3.0.0",
+    "starlette>=0.37.0",
+    "uvicorn[standard]>=0.30.0",
+    "anyio>=4.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-httpx>=0.30.0",
+    "respx>=0.21.0",
+    "ruff>=0.4.0",
+]
+
+[project.scripts]
+proxmox-mcp-vr = "proxmox_mcp_vr.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

@@ -1,0 +1,21 @@
+[Unit]
+Description=Proxmox MCP for VR/RE agents
+After=network.target
+
+[Service]
+Type=simple
+User=mcp
+Group=mcp
+EnvironmentFile=/etc/proxmox-mcp/env
+ExecStart=/opt/proxmox-mcp/.venv/bin/python -m proxmox_mcp_vr
+Restart=on-failure
+RestartSec=5
+
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ReadWritePaths=/var/lib/proxmox-mcp
+
+[Install]
+WantedBy=multi-user.target

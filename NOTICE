@@ -1,0 +1,16 @@
+proxmox-mcp-vr
+==============
+
+This product wraps and reuses code from:
+
+  ProxmoxMCP-Plus
+  https://github.com/RekklesNA/ProxmoxMCP-Plus
+  Copyright (c) RekklesNA and contributors
+  Licensed under the MIT License.
+
+The upstream project is installed as a runtime dependency. This package
+introspects its FastMCP tool registry to filter out destructive tools and
+adds in-guest QEMU agent control tools required for VR/RE/exploit-dev
+workflows.
+
+No upstream source files are copied into this repository.
