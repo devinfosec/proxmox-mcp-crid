@@ -103,9 +103,8 @@ def build_server():
     upstream = ProxmoxMCPServer(config_path)
     mcp = upstream.mcp
 
-    pve_api = upstream.proxmox_manager.proxmox if hasattr(
-        upstream, "proxmox_manager"
-    ) else upstream.proxmox
+    # Upstream stores the proxmoxer.ProxmoxAPI at proxmox_manager.api.
+    pve_api = upstream.proxmox_manager.api
     client = ProxmoxClient(pve_api)
     client.refresh_index()
     bind_client(client)
