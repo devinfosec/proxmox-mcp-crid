@@ -27,6 +27,12 @@ ALLOWED_POOL="${ALLOWED_POOL:-ai-redteam}"
 MCP_BIND="${MCP_BIND:-0.0.0.0:8080}"
 PVE_USER_DEFAULT="mcp-agent@pve"
 PVE_TOKEN_NAME_DEFAULT="mcpvr"
+# PVE_VERIFY_SSL=false -> verify_ssl: false + security.dev_mode: true
+# (upstream rejects verify_ssl=false without dev_mode). Defaults to true for
+# prod; flip to false for self-signed PVE certs (typical out-of-box install).
+PVE_VERIFY_SSL="${PVE_VERIFY_SSL:-true}"
+# Set FORCE_REWRITE_CONFIG=1 to overwrite an existing /etc/proxmox-mcp/config.json.
+FORCE_REWRITE_CONFIG="${FORCE_REWRITE_CONFIG:-0}"
 
 INSTALL_DIR=/opt/proxmox-mcp
 CONFIG_DIR=/etc/proxmox-mcp
@@ -132,17 +138,28 @@ if [[ -f "$CONFIG_DIR/config.toml" ]]; then
   rm -f "$CONFIG_DIR/config.toml"
 fi
 
-if [[ -f $CONFIG_JSON ]]; then
-  log "preserving existing $CONFIG_JSON (back it up + re-run if you want a rewrite)"
+if [[ -f $CONFIG_JSON && $FORCE_REWRITE_CONFIG != "1" ]]; then
+  log "preserving existing $CONFIG_JSON (re-run with FORCE_REWRITE_CONFIG=1 to rewrite)"
 else
-  log "writing $CONFIG_JSON"
+  [[ -f $CONFIG_JSON ]] && log "FORCE_REWRITE_CONFIG=1 — overwriting $CONFIG_JSON"
+  log "writing $CONFIG_JSON (verify_ssl=$PVE_VERIFY_SSL)"
   umask 027
+
+  if [[ $PVE_VERIFY_SSL == "false" ]]; then
+    SECURITY_BLOCK=',
+  "security": {
+    "dev_mode": true
+  }'
+  else
+    SECURITY_BLOCK=""
+  fi
+
   cat > "$CONFIG_JSON" <<EOF
 {
   "proxmox": {
     "host": "$PVE_HOST",
     "port": 8006,
-    "verify_ssl": true,
+    "verify_ssl": $PVE_VERIFY_SSL,
     "service": "PVE"
   },
   "auth": {
@@ -160,7 +177,7 @@ else
   },
   "jobs": {
     "sqlite_path": "$STATE_DIR/jobs.sqlite3"
-  }
+  }${SECURITY_BLOCK}
 }
 EOF
   chown root:"$SERVICE_USER" "$CONFIG_JSON"
