@@ -52,21 +52,29 @@ boundary.
 
 ## Install (LXC)
 
-See [`deploy/lxc-setup.md`](deploy/lxc-setup.md) for the full PVE-side
-provisioning steps. Short version:
+Two steps. PVE-side provisioning (pool/role/user/token, LXC creation) lives
+in [`deploy/lxc-setup.md`](deploy/lxc-setup.md) — those need root on the
+hypervisor, not the LXC. Once you have a PVE token and an empty LXC, drop
+into the LXC and run:
 
 ```bash
-# In the LXC, as root, once:
-adduser --system --group --home /opt/proxmox-mcp mcp
-python3.11 -m venv /opt/proxmox-mcp/.venv
-/opt/proxmox-mcp/.venv/bin/pip install \
-    git+https://github.com/devinfosec/proxmox-mcp-vr.git@main
+curl -fsSL https://raw.githubusercontent.com/devinfosec/proxmox-mcp-vr/main/deploy/install.sh \
+  | sudo bash
+```
 
-# Drop /etc/proxmox-mcp/env (see deploy/config.example.toml for env-var schema)
-# Drop bearer token: pwgen -s 64 1 > /etc/proxmox-mcp/bearer && chmod 600 /etc/proxmox-mcp/bearer
-# Install systemd unit:
-install -m 644 deploy/proxmox-mcp.service /etc/systemd/system/
-systemctl enable --now proxmox-mcp
+The script is idempotent: installs `python3.11`, creates the `mcp` user +
+venv, pip-installs this package, prompts for the four PVE fields it can't
+infer (host, user, token name, token value), generates a bearer token,
+installs the systemd unit, starts it, and prints the smoke-test commands.
+
+Non-interactive (e.g. from an automation harness):
+
+```bash
+sudo PVE_HOST=pve.lab.lan \
+     PVE_USER=mcp-agent@pve \
+     PVE_TOKEN_NAME=mcpvr \
+     PVE_TOKEN_VALUE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \
+     bash deploy/install.sh
 ```
 
 ## Configure CRID

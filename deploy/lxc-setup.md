@@ -49,6 +49,31 @@ pct enter 200
 
 ## 3. Inside the LXC: install
 
+One command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/devinfosec/proxmox-mcp-vr/main/deploy/install.sh \
+  | sudo bash
+```
+
+The script does everything: apt deps, `mcp` user, venv, pip install, config
+files, bearer-token generation, systemd unit, enable+start. It prompts for
+the four PVE fields it can't infer (host, user, token name, token value)
+unless you pre-set them as env vars:
+
+```bash
+sudo PVE_HOST=pve.lab.lan \
+     PVE_USER=mcp-agent@pve \
+     PVE_TOKEN_NAME=mcpvr \
+     PVE_TOKEN_VALUE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \
+     bash deploy/install.sh
+```
+
+Re-runs are safe: config and bearer files are preserved if they already exist.
+
+<details>
+<summary>What it does, manually</summary>
+
 ```bash
 apt-get update
 apt-get install -y python3.11 python3.11-venv git pwgen
@@ -75,6 +100,8 @@ systemctl daemon-reload
 systemctl enable --now proxmox-mcp
 systemctl status proxmox-mcp
 ```
+
+</details>
 
 ## 4. Verify
 
