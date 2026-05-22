@@ -58,8 +58,8 @@ hypervisor, not the LXC. Once you have a PVE token and an empty LXC, drop
 into the LXC and run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/devinfosec/proxmox-mcp-vr/main/deploy/install.sh \
-  | sudo bash
+curl -fsSL https://raw.githubusercontent.com/devinfosec/proxmox-mcp-crid/main/deploy/install.sh \
+  | bash
 ```
 
 The script is idempotent: installs `python3.11`, creates the `mcp` user +
@@ -70,11 +70,11 @@ installs the systemd unit, starts it, and prints the smoke-test commands.
 Non-interactive (e.g. from an automation harness):
 
 ```bash
-sudo PVE_HOST=pve.lab.lan \
-     PVE_USER=mcp-agent@pve \
-     PVE_TOKEN_NAME=mcpvr \
-     PVE_TOKEN_VALUE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \
-     bash deploy/install.sh
+PVE_HOST=pve.lab.lan \
+PVE_USER=mcp-agent@pve \
+PVE_TOKEN_NAME=mcpvr \
+PVE_TOKEN_VALUE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \
+bash deploy/install.sh
 ```
 
 ## Configure CRID

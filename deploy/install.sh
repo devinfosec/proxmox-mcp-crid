@@ -5,18 +5,23 @@
 # PVE_USER, PVE_TOKEN_NAME, PVE_TOKEN_VALUE, ALLOWED_POOL, MCP_BIND,
 # REPO_URL, REPO_REF); prompts for the ones it can't fill in.
 #
+# If invoked from a git checkout (pyproject.toml exists two levels up),
+# installs from that checkout instead of fetching REPO_URL. This is the
+# fast path for development and for repo names that differ from the
+# default.
+#
 # Steps 1 + 2 (pool/role/user/token on the PVE host, LXC creation) are
 # NOT in this script — they live in deploy/lxc-setup.md and need root
 # on the hypervisor, not the LXC.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/devinfosec/proxmox-mcp-vr/main/deploy/install.sh | sudo bash
-#   # or:
-#   sudo PVE_HOST=pve.lab.lan PVE_TOKEN_VALUE=xxx bash deploy/install.sh
+#   curl -fsSL https://raw.githubusercontent.com/devinfosec/proxmox-mcp-crid/main/deploy/install.sh | bash
+#   # or, from a local checkout:
+#   PVE_HOST=pve.lab.lan PVE_TOKEN_VALUE=xxx bash deploy/install.sh
 
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/devinfosec/proxmox-mcp-vr.git}"
+REPO_URL="${REPO_URL:-https://github.com/devinfosec/proxmox-mcp-crid.git}"
 REPO_REF="${REPO_REF:-main}"
 ALLOWED_POOL="${ALLOWED_POOL:-ai-redteam}"
 MCP_BIND="${MCP_BIND:-0.0.0.0:8080}"
@@ -28,11 +33,21 @@ CONFIG_DIR=/etc/proxmox-mcp
 STATE_DIR=/var/lib/proxmox-mcp
 SERVICE_USER=mcp
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOCAL_CHECKOUT=""
+if [[ -f "$SCRIPT_DIR/../pyproject.toml" ]]; then
+  LOCAL_CHECKOUT="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
+
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
 
-[[ $EUID -eq 0 ]] || die "run as root (try: sudo $0)"
+# Drop privileges to $SERVICE_USER without needing sudo. `runuser` is part
+# of util-linux and present on every modern Debian/Ubuntu base image.
+as_service_user() { runuser -u "$SERVICE_USER" -- "$@"; }
+
+[[ $EUID -eq 0 ]] || die "run as root"
 
 # ---------- prompt helper -------------------------------------------------
 prompt() {
@@ -78,13 +93,20 @@ install -d -m 750 -o root -g "$SERVICE_USER" "$CONFIG_DIR"
 # ---------- 3. venv + package --------------------------------------------
 if [[ ! -x "$INSTALL_DIR/.venv/bin/python" ]]; then
   log "creating venv at $INSTALL_DIR/.venv"
-  sudo -u "$SERVICE_USER" python3.11 -m venv "$INSTALL_DIR/.venv"
+  as_service_user python3.11 -m venv "$INSTALL_DIR/.venv"
 fi
 
-log "installing proxmox-mcp-vr from $REPO_URL@$REPO_REF"
-sudo -u "$SERVICE_USER" "$INSTALL_DIR/.venv/bin/pip" install --quiet --upgrade pip
-sudo -u "$SERVICE_USER" "$INSTALL_DIR/.venv/bin/pip" install --quiet --upgrade \
-  "git+${REPO_URL}@${REPO_REF}"
+log "upgrading pip"
+as_service_user "$INSTALL_DIR/.venv/bin/pip" install --upgrade pip
+
+if [[ -n $LOCAL_CHECKOUT ]]; then
+  log "installing proxmox-mcp-vr from local checkout $LOCAL_CHECKOUT"
+  as_service_user "$INSTALL_DIR/.venv/bin/pip" install --upgrade "$LOCAL_CHECKOUT"
+else
+  log "installing proxmox-mcp-vr from $REPO_URL @ $REPO_REF"
+  as_service_user "$INSTALL_DIR/.venv/bin/pip" install --upgrade \
+    "git+${REPO_URL}@${REPO_REF}"
+fi
 
 # ---------- 4. config files ----------------------------------------------
 prompt PVE_HOST       "Proxmox host (FQDN or IP)"
@@ -145,14 +167,18 @@ else
 fi
 
 # ---------- 5. systemd ---------------------------------------------------
-UNIT_SRC="$INSTALL_DIR/.venv/lib/python3.11/site-packages/proxmox_mcp_vr"
-# The package doesn't ship the unit file inside the wheel; fetch it from the
-# git checkout the same way pip got the package.
-TMP_UNIT="$(mktemp)"
-trap 'rm -f "$TMP_UNIT"' EXIT
-log "fetching systemd unit"
-curl -fsSL "${REPO_URL%.git}/raw/${REPO_REF}/deploy/proxmox-mcp.service" -o "$TMP_UNIT"
-install -m 644 "$TMP_UNIT" /etc/systemd/system/proxmox-mcp.service
+# The unit file isn't shipped in the wheel; copy from local checkout or fetch.
+if [[ -f "$LOCAL_CHECKOUT/deploy/proxmox-mcp.service" ]]; then
+  log "installing systemd unit from local checkout"
+  install -m 644 "$LOCAL_CHECKOUT/deploy/proxmox-mcp.service" \
+    /etc/systemd/system/proxmox-mcp.service
+else
+  TMP_UNIT="$(mktemp)"
+  trap 'rm -f "$TMP_UNIT"' EXIT
+  log "fetching systemd unit from $REPO_URL"
+  curl -fsSL "${REPO_URL%.git}/raw/${REPO_REF}/deploy/proxmox-mcp.service" -o "$TMP_UNIT"
+  install -m 644 "$TMP_UNIT" /etc/systemd/system/proxmox-mcp.service
+fi
 
 systemctl daemon-reload
 systemctl enable proxmox-mcp >/dev/null

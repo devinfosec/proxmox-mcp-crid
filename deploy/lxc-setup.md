@@ -52,8 +52,8 @@ pct enter 200
 One command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/devinfosec/proxmox-mcp-vr/main/deploy/install.sh \
-  | sudo bash
+curl -fsSL https://raw.githubusercontent.com/devinfosec/proxmox-mcp-crid/main/deploy/install.sh \
+  | bash
 ```
 
 The script does everything: apt deps, `mcp` user, venv, pip install, config
@@ -62,11 +62,11 @@ the four PVE fields it can't infer (host, user, token name, token value)
 unless you pre-set them as env vars:
 
 ```bash
-sudo PVE_HOST=pve.lab.lan \
-     PVE_USER=mcp-agent@pve \
-     PVE_TOKEN_NAME=mcpvr \
-     PVE_TOKEN_VALUE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \
-     bash deploy/install.sh
+PVE_HOST=pve.lab.lan \
+PVE_USER=mcp-agent@pve \
+PVE_TOKEN_NAME=mcpvr \
+PVE_TOKEN_VALUE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \
+bash deploy/install.sh
 ```
 
 Re-runs are safe: config and bearer files are preserved if they already exist.
@@ -84,7 +84,7 @@ install -d -o mcp -g mcp /var/lib/proxmox-mcp
 python3.11 -m venv /opt/proxmox-mcp/.venv
 /opt/proxmox-mcp/.venv/bin/pip install --upgrade pip
 /opt/proxmox-mcp/.venv/bin/pip install \
-    git+https://github.com/devinfosec/proxmox-mcp-vr.git@main
+    git+https://github.com/devinfosec/proxmox-mcp-crid.git@main
 
 install -d -m 750 -o root -g mcp /etc/proxmox-mcp
 install -m 640 -o root -g mcp deploy/config.example.toml /etc/proxmox-mcp/config.toml
