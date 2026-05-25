@@ -42,7 +42,7 @@ def register(mcp: Any, client: ProxmoxClient) -> None:
     )
     def agent_exec_status(vmid: int, pid: int) -> dict[str, Any]:
         require_pool(vmid)
-        return client.agent(vmid)["exec-status"].get(pid=pid)
+        return client.agent(vmid)("exec-status").get(pid=pid)
 
     @mcp.tool(
         description=(
@@ -67,7 +67,7 @@ def register(mcp: Any, client: ProxmoxClient) -> None:
 
         deadline = time.monotonic() + timeout_s
         while time.monotonic() < deadline:
-            status = client.agent(vmid)["exec-status"].get(pid=pid)
+            status = client.agent(vmid)("exec-status").get(pid=pid)
             if status.get("exited"):
                 return status
             time.sleep(poll_interval_s)

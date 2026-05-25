@@ -18,7 +18,7 @@ def register(mcp: Any, client: ProxmoxClient) -> None:
     )
     def agent_file_read(vmid: int, file: str) -> dict[str, Any]:
         require_pool(vmid)
-        return client.agent(vmid)["file-read"].get(file=file)
+        return client.agent(vmid)("file-read").get(file=file)
 
     @mcp.tool(
         description=(
@@ -29,7 +29,7 @@ def register(mcp: Any, client: ProxmoxClient) -> None:
     )
     def agent_file_write(vmid: int, file: str, content: str) -> dict[str, Any]:
         require_pool(vmid)
-        return client.agent(vmid)["file-write"].post(file=file, content=content)
+        return client.agent(vmid)("file-write").post(file=file, content=content)
 
     @mcp.tool(
         description=(
