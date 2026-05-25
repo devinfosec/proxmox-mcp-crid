@@ -29,7 +29,8 @@ def register(mcp: Any, client: ProxmoxClient) -> None:
     )
     def agent_file_write(vmid: int, file: str, content: str) -> dict[str, Any]:
         require_pool(vmid)
-        return client.agent(vmid)("file-write").post(file=file, content=content)
+        client.agent(vmid)("file-write").post(file=file, content=content)
+        return {"ok": True}
 
     @mcp.tool(
         description=(
@@ -39,4 +40,5 @@ def register(mcp: Any, client: ProxmoxClient) -> None:
     )
     def agent_ping(vmid: int) -> dict[str, Any]:
         require_pool(vmid)
-        return client.agent(vmid).ping.post()
+        result = client.agent(vmid).ping.post()
+        return result if isinstance(result, dict) else {"ok": True}
