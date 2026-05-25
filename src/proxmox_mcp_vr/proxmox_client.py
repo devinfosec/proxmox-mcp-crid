@@ -13,7 +13,10 @@ client.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 
 class ProxmoxClient:
@@ -25,9 +28,12 @@ class ProxmoxClient:
         self._index: dict[int, dict[str, str]] = {}
 
     def refresh_index(self) -> None:
-        """Populate vmid → {node, pool, type} from /cluster/resources?type=vm.
+        """Populate vmid → {node, pool, type} from /cluster/resources + /pools.
 
-        Called at startup and on cache-miss. Cheap on PVE clusters.
+        The ``/cluster/resources?type=vm`` endpoint does not reliably
+        include the ``pool`` field for VMs that belong to a pool.  We
+        supplement it by querying each pool's member list and writing the
+        pool name back onto matching vmids.
         """
         resources = self.api.cluster.resources.get(type="vm")
         new_index: dict[int, dict[str, str]] = {}
@@ -40,6 +46,25 @@ class ProxmoxClient:
                 "pool": r.get("pool", ""),
                 "type": r.get("type", ""),
             }
+
+        # Enrich with authoritative pool membership from /pools.
+        try:
+            pools = self.api.pools.get()
+            for pool_entry in pools:
+                pool_name = pool_entry.get("poolid", "")
+                if not pool_name:
+                    continue
+                try:
+                    pool_detail = self.api.pools(pool_name).get()
+                    for member in pool_detail.get("members", []):
+                        mid = member.get("vmid")
+                        if mid is not None and int(mid) in new_index:
+                            new_index[int(mid)]["pool"] = pool_name
+                except Exception:
+                    log.debug("failed to query pool %r members", pool_name)
+        except Exception:
+            log.debug("failed to list pools; relying on cluster/resources pool field")
+
         self._index = new_index
 
     def lookup(self, vmid: int) -> dict[str, str]:

@@ -75,12 +75,30 @@ class _Method:
 def fake_api() -> FakeAPI:
     api = FakeAPI()
     # Seed the cluster resources lookup that ProxmoxClient.refresh_index needs.
+    # Real PVE often omits the pool field from /cluster/resources, so we
+    # replicate that here — pool membership comes from /pools instead.
     api.responses[(("cluster", "resources"), "get")] = [
-        {"vmid": 9001, "node": "pve1", "pool": "ai-redteam", "type": "qemu"},
-        {"vmid": 9002, "node": "pve1", "pool": "ai-redteam", "type": "qemu"},
+        {"vmid": 9001, "node": "pve1", "type": "qemu"},
+        {"vmid": 9002, "node": "pve1", "type": "qemu"},
         {"vmid": 100,  "node": "pve1", "pool": "production", "type": "qemu"},
-        {"vmid": 200,  "node": "pve1", "pool": "",           "type": "qemu"},
+        {"vmid": 200,  "node": "pve1", "type": "qemu"},
     ]
+    # Pool membership via /pools and /pools/{poolid}
+    api.responses[(("pools",), "get")] = [
+        {"poolid": "ai-redteam"},
+        {"poolid": "production"},
+    ]
+    api.responses[(("pools", "ai-redteam"), "get")] = {
+        "members": [
+            {"vmid": 9001, "node": "pve1", "type": "qemu"},
+            {"vmid": 9002, "node": "pve1", "type": "qemu"},
+        ],
+    }
+    api.responses[(("pools", "production"), "get")] = {
+        "members": [
+            {"vmid": 100, "node": "pve1", "type": "qemu"},
+        ],
+    }
     return api
 
 
