@@ -24,6 +24,23 @@ on a FastMCP instance, then post-init:
 The Proxmox API token never leaves the LXC. CRID authenticates to the MCP
 with a separate bearer token (rotated independently).
 
+### Running commands in a guest
+
+Three exec tools sit on the QEMU guest agent:
+
+- **`exec_blocking`** — the **preferred** way to run a command and get its
+  output. Runs and waits server-side (default `timeout_s=120`), then returns
+  the final exec-status. The agent never needs to poll or `sleep`. On timeout
+  it returns `{exited: false, timed_out: true, pid}` (it does **not** raise),
+  so the caller can keep polling that pid with `agent_exec_status`.
+- **`agent_exec`** — fire-and-forget for long-running/background commands;
+  returns a pid. If you want the output, use `exec_blocking` instead.
+- **`agent_exec_status`** — poll a pid for output/exit.
+
+`command` is an **argv list** (e.g. `["whoami"]`), executed without a shell —
+for pipes/redirects wrap it as `["bash", "-c", "…"]` (Linux) or
+`["cmd", "/c", "…"]` / `["powershell", "-Command", "…"]` (Windows).
+
 ## Wrapper vs fork — decision
 
 **Wrapper.** ProxmoxMCP-Plus's `ProxmoxMCPServer` uses FastMCP's
