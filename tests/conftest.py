@@ -115,10 +115,12 @@ class FakeMCP:
 
     def __init__(self) -> None:
         self.tools: dict[str, Any] = {}
+        self.descriptions: dict[str, str] = {}
 
     def tool(self, description: str = ""):
         def deco(fn):
             self.tools[fn.__name__] = fn
+            self.descriptions[fn.__name__] = description
             return fn
         return deco
 

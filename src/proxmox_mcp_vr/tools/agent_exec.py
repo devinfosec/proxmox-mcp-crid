@@ -18,9 +18,14 @@ from ..proxmox_client import ProxmoxClient
 def register(mcp: Any, client: ProxmoxClient) -> None:
     @mcp.tool(
         description=(
-            "Start a command inside the guest VM via QEMU guest agent. "
-            "Returns the PVE-assigned pid; use agent_exec_status to read output. "
-            "Refused if VM is not in the configured ai-redteam pool."
+            "Fire-and-forget: start a command inside the guest VM via the QEMU "
+            "guest agent and return immediately with the PVE-assigned pid. "
+            "Use this ONLY for long-running/background commands. If you need the "
+            "command's output, call exec_blocking instead — never run `sleep` or "
+            "poll in a loop to wait for it. `command` is an argv list (e.g. "
+            "['ip','-o','-4','addr','show']); for shell features like pipes wrap "
+            "it as ['bash','-c','...']. Refused if the VM is not in the "
+            "configured ai-redteam pool."
         )
     )
     def agent_exec(
@@ -46,15 +51,20 @@ def register(mcp: Any, client: ProxmoxClient) -> None:
 
     @mcp.tool(
         description=(
-            "Run a command in the guest and wait for it to finish (or timeout). "
-            "Composite of agent_exec + agent_exec_status polling. "
-            "Returns the final exec-status dict, or raises TimeoutError."
+            "PREFERRED way to run a command in a guest VM and get its output. "
+            "Runs the command and waits server-side until it finishes (or the "
+            "timeout), then returns the final exec-status dict. Do NOT run "
+            "`sleep` or poll yourself — the waiting happens here. `command` is an "
+            "argv list (e.g. ['whoami']); for pipes/redirects wrap it as "
+            "['bash','-c','...']. On timeout it returns a dict with "
+            "{exited: false, timed_out: true, pid} rather than raising, so you "
+            "can keep polling that pid with agent_exec_status if needed."
         )
     )
     def exec_blocking(
         vmid: int,
         command: list[str],
-        timeout_s: int = 30,
+        timeout_s: int = 120,
         input_data: str | None = None,
         poll_interval_s: float = 0.5,
     ) -> dict[str, Any]:
@@ -71,4 +81,7 @@ def register(mcp: Any, client: ProxmoxClient) -> None:
             if status.get("exited"):
                 return status
             time.sleep(poll_interval_s)
-        raise TimeoutError(f"exec_blocking: pid {pid} did not exit within {timeout_s}s")
+        # Timed out: hand back a structured result (with the pid) instead of
+        # raising, so the agent can poll agent_exec_status rather than fall
+        # back to fire-and-forget + sleep.
+        return {"exited": False, "timed_out": True, "pid": pid, "timeout_s": timeout_s}
